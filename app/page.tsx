@@ -230,13 +230,10 @@ export default function Home() {
                 </div>
                 <div className="text-center space-y-3 max-w-md">
                   <h3 className="text-2xl font-semibold text-foreground">
-                    {searchQuery ? "No repositories found" : "Search for GitHub repositories"}
+                    Search for GitHub repositories
                   </h3>
                   <p className="text-base text-muted-foreground leading-relaxed">
-                    {searchQuery 
-                      ? "Try adjusting your search query or search for a different repository name."
-                      : "Enter a search query above to find repositories on GitHub."
-                    }
+                    Enter a search query above to find repositories on GitHub.
                   </p>
                 </div>
               </motion.div>
