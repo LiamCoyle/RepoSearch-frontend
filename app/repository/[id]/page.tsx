@@ -2,17 +2,18 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { api, ApiError } from "@/lib/api";
-import type { RepositoryDetails, Commit, ContributorStats, Contributor, RepositoryLanguages } from "@/types/github";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
+import type { RepositoryDetails } from "@/types/github";
+import { RepositoryHeader } from "@/components/repository/repository-header";
+import { CommitTimeline } from "@/components/repository/commit-timeline";
+import { ContributorsList } from "@/components/repository/contributors-list";
+import { UserImpact } from "@/components/repository/user-impact";
+import { LanguageDistribution } from "@/components/repository/language-distribution";
 
 export default function RepositoryDetailPage() {
   const params = useParams();
@@ -24,111 +25,9 @@ export default function RepositoryDetailPage() {
   }, [repositoryId]);
 
   const [repository, setRepository] = useState<RepositoryDetails | null>(null);
-  const [commits, setCommits] = useState<Commit[]>([]);
-  const [contributors, setContributors] = useState<Contributor[]>([]);
-  const [languages, setLanguages] = useState<RepositoryLanguages>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isNotFound, setIsNotFound] = useState(false);
 
-  // Calculate commit counts from last 100 commits for each contributor (by ID)
-  // Use the author field from commits
-  const commitCountsFromLast100 = useMemo(() => {
-    const counts = new Map<number, number>();
-    
-    commits.forEach((commit) => {
-      // Use author field from commit
-      const author = commit.author;
-      
-      // Only count if we have a valid author ID
-      if (author?.id) {
-        counts.set(author.id, (counts.get(author.id) || 0) + 1);
-      }
-    });
-    
-    return counts;
-  }, [commits]);
-
-  // Process contributors with impact from last 100 commits
-  // Only include contributors who have commits in the last 100 commits
-  const contributorStats = useMemo<ContributorStats[]>(() => {
-    if (contributors.length === 0) return [];
-
-    const totalCommits = commits.length || 1;
-
-    return contributors
-      .map((contributor) => {
-        // Match by contributor ID
-        const commitCount = commitCountsFromLast100.get(contributor.id) || 0;
-        
-        return {
-          login: contributor.login,
-          name: contributor.login, // Contributors API doesn't provide name
-          avatar_url: contributor.avatar_url,
-          html_url: contributor.html_url,
-          commitCount,
-          percentage: totalCommits > 0 ? (commitCount / totalCommits) * 100 : 0,
-        };
-      })
-      .filter((contributor) => contributor.commitCount > 0) // Only show contributors with commits in last 100
-      .sort((a, b) => b.percentage - a.percentage);
-  }, [contributors, commitCountsFromLast100, commits.length]);
-
-  // Process commits for timeline (group by date)
-  const timelineData = useMemo(() => {
-    if (commits.length === 0) return [];
-
-    const dateMap = new Map<string, number>();
-
-    commits.forEach((commit) => {
-      const date = new Date(commit.commit.committer.date);
-      const dateKey = date.toISOString().split("T")[0]; // YYYY-MM-DD
-      dateMap.set(dateKey, (dateMap.get(dateKey) || 0) + 1);
-    });
-
-    return Array.from(dateMap.entries())
-      .map(([date, commits]) => ({ 
-        date, 
-        commits,
-        formattedDate: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [commits]);
-
-  // Process language data for pie chart
-  const languageData = useMemo(() => {
-    if (Object.keys(languages).length === 0) return [];
-    
-    const totalBytes = Object.values(languages).reduce((sum, bytes) => sum + bytes, 0);
-    
-    return Object.entries(languages)
-      .map(([language, bytes]) => ({
-        name: language,
-        value: bytes,
-        percentage: ((bytes / totalBytes) * 100).toFixed(1),
-      }))
-      .sort((a, b) => b.value - a.value);
-  }, [languages]);
-
-  // Color palette for languages - using CSS variables
-  const LANGUAGE_COLORS = [
-    "var(--chart-1)",
-    "var(--chart-2)",
-    "var(--chart-3)",
-    "var(--chart-4)",
-    "var(--chart-5)",
-    "var(--destructive)",
-    "var(--primary)",
-  ];
-
-  const chartConfig = {
-    commits: {
-      label: "Commits",
-      theme: {
-        light: "oklch(0.646 0.222 41.116)",
-        dark: "oklch(0.488 0.243 264.376)",
-      },
-    },
-  };
 
   useEffect(() => {
     if (!repoId) {
@@ -137,25 +36,12 @@ export default function RepositoryDetailPage() {
       return;
     }
 
-    const fetchData = async () => {
+
+    const fetchRepositoryData = async () => {
       setIsLoading(true);
       try {
         const repoDetails = await api.getRepositoryById(repoId);
-        const [owner, repo] = repoDetails.full_name.split("/");
-        
-        // Fetch commits
-        const commitsData = await api.getRepositoryCommits(owner, repo, 100);
-        setCommits(commitsData);
-
-        // Fetch languages
-        const languagesData = await api.getRepositoryLanguages(owner, repo);
-        setLanguages(languagesData);
-
-        // Fetch all contributors (backend handles pagination)
-        const allContributors = await api.getRepositoryContributors(owner, repo);
-
         setRepository(repoDetails);
-        setContributors(allContributors);
       } catch (err) {
         if (err instanceof ApiError) {
           if (err.status === 404) {
@@ -173,8 +59,9 @@ export default function RepositoryDetailPage() {
       }
     };
 
-    fetchData();
-  }, [repoId, router]);
+    fetchRepositoryData();
+    
+  }, [repoId]);
 
   if (isLoading) {
     return (
@@ -215,23 +102,14 @@ export default function RepositoryDetailPage() {
     return null;
   }
 
+  const [owner, repo] = repository.full_name.split("/");
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
       transition: {
         staggerChildren: 0.1,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
       },
     },
   };
@@ -244,113 +122,9 @@ export default function RepositoryDetailPage() {
       className="h-[calc(100vh-4rem)] bg-background font-sans overflow-y-auto"
     >
       <div className="container mx-auto max-w-6xl px-4 py-8">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3 }}
-          className="mb-6"
-        >
-          <Link href="/">
-            <Button variant="outline" className="cursor-pointer">← Back to Search</Button>
-          </Link>
-        </motion.div>
+        <RepositoryHeader repository={repository} />
 
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-8"
-        >
-          <h1 className="text-4xl font-semibold tracking-tight text-black dark:text-zinc-50 mb-2">
-            {repository.full_name}
-          </h1>
-          {repository.description && (
-            <p className="text-lg text-zinc-600 dark:text-zinc-400 mb-4">
-              {repository.description}
-            </p>
-          )}
-          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-            {repository.language && (
-              <span className="flex items-center gap-1">
-                <span className="h-3 w-3 rounded-full bg-primary"></span>
-                {repository.language}
-              </span>
-            )}
-            <span>⭐ {repository.stargazers_count.toLocaleString()}</span>
-            <span>🍴 {repository.forks_count.toLocaleString()}</span>
-            <a
-              href={repository.html_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              View on GitHub →
-            </a>
-          </div>
-        </motion.div>
-
-        {/* Timeline */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="mb-6"
-        >
-          <Card className="bg-background">
-            <CardHeader>
-              <CardTitle>Commit Timeline</CardTitle>
-              <CardDescription>
-                Distribution of commits over time (last 100 commits)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {timelineData.length === 0 ? (
-                <p className="text-muted-foreground">No timeline data available</p>
-              ) : (
-                <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                  <LineChart
-                    data={timelineData}
-                    margin={{
-                      top: 5,
-                      right: 10,
-                      left: 10,
-                      bottom: 5,
-                    }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis
-                      dataKey="formattedDate"
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      className="text-xs"
-                      tick={{ fill: "currentColor" }}
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickMargin={8}
-                      className="text-xs"
-                      tick={{ fill: "currentColor" }}
-                    />
-                    <ChartTooltip
-                      cursor={false}
-                      content={<ChartTooltipContent indicator="dot" />}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="commits"
-                      stroke="var(--color-commits)"
-                      strokeWidth={2}
-                      dot={{ fill: "var(--color-commits)", r: 3 }}
-                      activeDot={{ r: 5 }}
-                    />
-                  </LineChart>
-                </ChartContainer>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+        <CommitTimeline owner={owner} repo={repo} />
 
         <motion.div
           variants={containerVariants}
@@ -358,153 +132,9 @@ export default function RepositoryDetailPage() {
           animate="visible"
           className="grid gap-6 md:grid-cols-3"
         >
-          {/* Contributors List */}
-          <motion.div variants={itemVariants}>
-            <Card className="bg-background h-full">
-              <CardHeader>
-                <CardTitle>Contributors ({contributors.length})</CardTitle>
-                <CardDescription>
-                  List of users who have contributed to this project
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar">
-                  {contributors.length === 0 ? (
-                    <p className="text-muted-foreground">No contributors found</p>
-                  ) : (
-                    contributors.map((contributor) => (
-                      <div
-                        key={contributor.id}
-                        className="flex items-center gap-3 p-2 rounded-md hover:bg-accent"
-                      >
-                      {contributor.avatar_url && (
-                        <Image
-                          src={contributor.avatar_url}
-                          alt={contributor.login}
-                          width={40}
-                          height={40}
-                          className="w-10 h-10 rounded-full"
-                          unoptimized
-                        />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <a
-                          href={contributor.html_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-medium text-primary hover:underline block truncate"
-                        >
-                          {contributor.login}
-                        </a>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {contributor.contributions} {contributor.contributions === 1 ? 'contribution' : 'contributions'}
-                        </p>
-                      </div>
-                    </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Impact Analysis */}
-          <motion.div variants={itemVariants}>
-            <Card className="bg-background h-full">
-            <CardHeader>
-              <CardTitle>User Impact</CardTitle>
-              <CardDescription>
-                Contribution percentage based on last 100 commits
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4 max-h-96 overflow-y-auto custom-scrollbar">
-                {contributorStats.length === 0 ? (
-                  <p className="text-muted-foreground">No data available</p>
-                ) : (
-                  contributorStats.map((contributor) => (
-                    <div key={contributor.login} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">{contributor.login}</span>
-                        <span className="text-muted-foreground">
-                          {contributor.commitCount} commits
-                        </span>
-                      </div>
-                      <div className="w-full bg-secondary rounded-full h-2">
-                        <div
-                          className="bg-primary h-2 rounded-full transition-all"
-                          style={{ width: `${contributor.percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          </motion.div>
-
-          {/* Language Distribution */}
-          {languageData.length > 0 && (
-            <motion.div variants={itemVariants}>
-              <Card className="bg-background h-full">
-                <CardHeader>
-                  <CardTitle>Language Distribution</CardTitle>
-                  <CardDescription>
-                    Breakdown of programming languages used in this repository
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Shared Progress Bar */}
-                    <div className="w-full h-3 rounded-full overflow-hidden bg-secondary flex">
-                      {languageData.map((entry: { name: string; value: number; percentage: string }, index: number) => {
-                        const percentage = parseFloat(entry.percentage);
-                        
-                        return (
-                          <div
-                            key={entry.name}
-                            className="h-full"
-                            style={{
-                              width: `${percentage}%`,
-                              backgroundColor: LANGUAGE_COLORS[index % LANGUAGE_COLORS.length],
-                            }}
-                            title={`${entry.name}: ${entry.percentage}%`}
-                          />
-                        );
-                      })}
-                    </div>
-                    
-                    {/* Language List */}
-                    <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
-                      {languageData.map((entry: { name: string; value: number; percentage: string }, index: number) => {
-                        const bytes = entry.value;
-                        const mb = (bytes / (1024 * 1024)).toFixed(2);
-                        const kb = (bytes / 1024).toFixed(2);
-                        const size = bytes >= 1024 * 1024 ? `${mb} MB` : `${kb} KB`;
-                        
-                        return (
-                          <div key={entry.name} className="flex items-center justify-between text-sm">
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="h-3 w-3 rounded-full"
-                                style={{ backgroundColor: LANGUAGE_COLORS[index % LANGUAGE_COLORS.length] }}
-                              />
-                              <span className="font-medium">{entry.name}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-muted-foreground">{size}</span>
-                              <span className="font-semibold text-foreground">{entry.percentage}%</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
+          <ContributorsList owner={owner} repo={repo} />
+          <UserImpact owner={owner} repo={repo} />
+          <LanguageDistribution owner={owner} repo={repo} />
         </motion.div>
       </div>
     </motion.div>

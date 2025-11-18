@@ -49,13 +49,19 @@ export interface RepositoryDetails {
 }
 
 /**
- * Repository contributor
+ * Repository contributor (standardized format from backend)
+ * All fields are always present - null for fields not applicable to the type
+ * - User type: has login, id, avatar_url, html_url; email and name are null
+ * - Anonymous type: has email, name; login, id, avatar_url, html_url are null
  */
 export interface Contributor {
-  login: string;
-  id: number;
-  avatar_url: string;
-  html_url: string;
+  type: "User" | "Anonymous";
+  login: string | null;
+  id: number | null;
+  avatar_url: string | null;
+  html_url: string | null;
+  email: string | null;
+  name: string | null;
   contributions: number;
   [key: string]: unknown;
 }
@@ -120,10 +126,11 @@ export interface Commit {
 export interface ContributorStats {
   login: string;
   name: string;
-  avatar_url: string;
-  html_url: string;
+  avatar_url?: string;
+  html_url?: string;
   commitCount: number;
   percentage: number;
+  isAnonymous?: boolean;
 }
 
 /**

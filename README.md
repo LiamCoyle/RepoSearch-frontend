@@ -9,10 +9,11 @@ A modern Next.js application for searching and exploring GitHub repositories wit
   - Commit timeline visualization (last 100 commits)
   - Complete contributor list with total contributions
   - User impact analysis based on recent commits
+  - Codebase language distribition
 - 🎨 **Modern UI**: Built with shadcn/ui components and Tailwind CSS
 - 🌓 **Dark Mode**: Full dark/light theme support with system preference detection
 - 📱 **Responsive Design**: Optimized for all screen sizes
-- ⚡ **Fast Performance**: Built with Next.js 15 and React Server Components
+
 
 ## Tech Stack
 
@@ -64,26 +65,7 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Project Structure
 
-```
-frontend/
-├── app/                    # Next.js App Router pages
-│   ├── page.tsx           # Main search page
-│   ├── repository/         # Repository detail pages
-│   │   └── [id]/          # Dynamic route for repository details
-│   ├── layout.tsx         # Root layout with providers
-│   └── globals.css        # Global styles
-├── components/            # React components
-│   ├── ui/                # shadcn/ui components
-│   ├── layout/            # Layout components (header)
-│   └── theme-toggle.tsx   # Theme switcher
-├── lib/                   # Utility functions
-│   └── api.ts            # API client for backend communication
-├── types/                 # TypeScript type definitions
-│   └── github.ts         # GitHub API types
-└── public/               # Static assets
-```
 
 ## Key Features
 
@@ -97,18 +79,12 @@ frontend/
 - **Commit Timeline**: Visual graph showing commit distribution over time (last 100 commits)
 - **Contributors**: List of all repository contributors sorted by total contributions
 - **User Impact**: Analysis of contributor impact based on commits in the last 100 commits
+- **Language Distribution**: Visual representation of the languages used in the repository
 
 ### Theme Support
 
 - Manual theme toggle
 
-## API Integration
-
-
-- GitHub Repository search
-- GitHub Repository details by ID
-- GitHub Repository commits (last 100)
-- GitHub Repository contributors
 
 
 ## Development
