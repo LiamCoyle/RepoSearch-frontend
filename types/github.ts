@@ -126,3 +126,10 @@ export interface ContributorStats {
   percentage: number;
 }
 
+/**
+ * Repository languages (bytes of code per language)
+ */
+export interface RepositoryLanguages {
+  [language: string]: number;
+}
+

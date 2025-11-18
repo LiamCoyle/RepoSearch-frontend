@@ -3,12 +3,12 @@
  */
 
 import type {
-  Repository,
   RepositorySearchResponse,
   RepositoryDetails,
   Contributor,
   Issue,
   Commit,
+  RepositoryLanguages,
 } from '@/types/github';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -90,13 +90,19 @@ export const api = {
   /**
    * Search GitHub repositories
    * @param query - Search query string
+   * @param perPage - Number of results per page (default: 10, max: 100)
+   * @param page - Page number (default: 1)
    */
-  async searchRepositories(query: string): Promise<RepositorySearchResponse> {
+  async searchRepositories(
+    query: string,
+    perPage: number = 10,
+    page: number = 1
+  ): Promise<RepositorySearchResponse> {
     if (!query.trim()) {
       throw new ApiError('Query parameter is required', 400);
     }
     return fetchApi<RepositorySearchResponse>(
-      `/github/search?query=${encodeURIComponent(query)}`
+      `/github/search?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}`
     );
   },
 
@@ -131,23 +137,19 @@ export const api = {
   },
 
   /**
-   * Get repository contributors (paginated)
+   * Get repository contributors (all contributors, pagination handled by backend)
    * @param owner - Repository owner (username or organization)
    * @param repo - Repository name
-   * @param perPage - Number of contributors per page (default: 100)
-   * @param page - Page number (default: 1)
    */
   async getRepositoryContributors(
     owner: string,
-    repo: string,
-    perPage: number = 100,
-    page: number = 1
+    repo: string
   ): Promise<Contributor[]> {
     if (!owner.trim() || !repo.trim()) {
       throw new ApiError('Owner and repo parameters are required', 400);
     }
     return fetchApi<Contributor[]>(
-      `/github/get_repository_contributors?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&per_page=${perPage}&page=${page}`
+      `/github/get_repository_contributors?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`
     );
   },
 
@@ -184,6 +186,23 @@ export const api = {
     }
     return fetchApi<Commit[]>(
       `/github/get_repository_commits?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}&per_page=${perPage}`
+    );
+  },
+
+  /**
+   * Get repository languages
+   * @param owner - Repository owner (username or organization)
+   * @param repo - Repository name
+   */
+  async getRepositoryLanguages(
+    owner: string,
+    repo: string
+  ): Promise<RepositoryLanguages> {
+    if (!owner.trim() || !repo.trim()) {
+      throw new ApiError('Owner and repo parameters are required', 400);
+    }
+    return fetchApi<RepositoryLanguages>(
+      `/github/get_repository_languages?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`
     );
   },
 };

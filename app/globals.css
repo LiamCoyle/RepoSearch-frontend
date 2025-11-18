@@ -118,6 +118,20 @@
   }
   body {
     @apply bg-background text-foreground;
+    position: relative;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    opacity: 0.12;
+    pointer-events: none;
+    background-image: radial-gradient(circle, currentColor 1px, transparent 1px);
+    background-size: 20px 20px;
+    z-index: 0;
+  }
+  .dark body::before {
+    opacity: 0.05;
   }
 }
 
@@ -127,6 +141,17 @@
   .custom-scrollbar::-webkit-scrollbar {
     width: 8px;
     height: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-button:start:decrement,
+  .custom-scrollbar::-webkit-scrollbar-button:end:increment {
+    display: none;
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {

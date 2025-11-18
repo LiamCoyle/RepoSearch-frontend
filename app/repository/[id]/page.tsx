@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { api, ApiError } from "@/lib/api";
-import type { RepositoryDetails, Commit, ContributorStats, Contributor } from "@/types/github";
+import type { RepositoryDetails, Commit, ContributorStats, Contributor, RepositoryLanguages } from "@/types/github";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 
 export default function RepositoryDetailPage() {
@@ -26,6 +26,7 @@ export default function RepositoryDetailPage() {
   const [repository, setRepository] = useState<RepositoryDetails | null>(null);
   const [commits, setCommits] = useState<Commit[]>([]);
   const [contributors, setContributors] = useState<Contributor[]>([]);
+  const [languages, setLanguages] = useState<RepositoryLanguages>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isNotFound, setIsNotFound] = useState(false);
 
@@ -93,6 +94,32 @@ export default function RepositoryDetailPage() {
       .sort((a, b) => a.date.localeCompare(b.date));
   }, [commits]);
 
+  // Process language data for pie chart
+  const languageData = useMemo(() => {
+    if (Object.keys(languages).length === 0) return [];
+    
+    const totalBytes = Object.values(languages).reduce((sum, bytes) => sum + bytes, 0);
+    
+    return Object.entries(languages)
+      .map(([language, bytes]) => ({
+        name: language,
+        value: bytes,
+        percentage: ((bytes / totalBytes) * 100).toFixed(1),
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [languages]);
+
+  // Color palette for languages - using CSS variables
+  const LANGUAGE_COLORS = [
+    "var(--chart-1)",
+    "var(--chart-2)",
+    "var(--chart-3)",
+    "var(--chart-4)",
+    "var(--chart-5)",
+    "var(--destructive)",
+    "var(--primary)",
+  ];
+
   const chartConfig = {
     commits: {
       label: "Commits",
@@ -120,32 +147,12 @@ export default function RepositoryDetailPage() {
         const commitsData = await api.getRepositoryCommits(owner, repo, 100);
         setCommits(commitsData);
 
-        // Fetch all contributors by paginating through pages
-        const allContributors: Contributor[] = [];
-        let page = 1;
-        const perPage = 100;
-        let hasMore = true;
+        // Fetch languages
+        const languagesData = await api.getRepositoryLanguages(owner, repo);
+        setLanguages(languagesData);
 
-        while (hasMore) {
-          const contributorsPage = await api.getRepositoryContributors(owner, repo, perPage, page);
-          
-          if (contributorsPage.length === 0) {
-            hasMore = false;
-          } else {
-            allContributors.push(...contributorsPage);
-            
-            // If we got less than perPage, we've reached the end
-            if (contributorsPage.length < perPage) {
-              hasMore = false;
-            } else {
-              page++;
-              // Safety limit: stop after 10 pages (1000 contributors)
-              if (page > 10) {
-                hasMore = false;
-              }
-            }
-          }
-        }
+        // Fetch all contributors (backend handles pagination)
+        const allContributors = await api.getRepositoryContributors(owner, repo);
 
         setRepository(repoDetails);
         setContributors(allContributors);
@@ -171,7 +178,7 @@ export default function RepositoryDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+      <div className="flex min-h-screen items-center justify-center bg-background font-sans">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -187,7 +194,7 @@ export default function RepositoryDetailPage() {
 
   if (isNotFound) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black px-4">
+      <div className="flex min-h-screen items-center justify-center bg-background font-sans px-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-6">
             <h1 className="text-6xl font-bold text-primary mb-4">404</h1>
@@ -234,7 +241,7 @@ export default function RepositoryDetailPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
-      className="h-[calc(100vh-4rem)] bg-zinc-50 font-sans dark:bg-black overflow-y-auto"
+      className="h-[calc(100vh-4rem)] bg-background font-sans overflow-y-auto"
     >
       <div className="container mx-auto max-w-6xl px-4 py-8">
         <motion.div
@@ -244,7 +251,7 @@ export default function RepositoryDetailPage() {
           className="mb-6"
         >
           <Link href="/">
-            <Button variant="outline">← Back to Search</Button>
+            <Button variant="outline" className="cursor-pointer">← Back to Search</Button>
           </Link>
         </motion.div>
 
@@ -287,72 +294,73 @@ export default function RepositoryDetailPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
+          className="mb-6"
         >
-          <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Commit Timeline</CardTitle>
-            <CardDescription>
-              Distribution of commits over time (last 100 commits)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {timelineData.length === 0 ? (
-              <p className="text-muted-foreground">No timeline data available</p>
-            ) : (
-              <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                <LineChart
-                  data={timelineData}
-                  margin={{
-                    top: 5,
-                    right: 10,
-                    left: 10,
-                    bottom: 5,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis
-                    dataKey="formattedDate"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    className="text-xs"
-                    tick={{ fill: "currentColor" }}
-                  />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    className="text-xs"
-                    tick={{ fill: "currentColor" }}
-                  />
-                  <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent indicator="dot" />}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="commits"
-                    stroke="var(--color-commits)"
-                    strokeWidth={2}
-                    dot={{ fill: "var(--color-commits)", r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
-                </LineChart>
-              </ChartContainer>
-            )}
-          </CardContent>
-        </Card>
+          <Card className="bg-background">
+            <CardHeader>
+              <CardTitle>Commit Timeline</CardTitle>
+              <CardDescription>
+                Distribution of commits over time (last 100 commits)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {timelineData.length === 0 ? (
+                <p className="text-muted-foreground">No timeline data available</p>
+              ) : (
+                <ChartContainer config={chartConfig} className="h-[300px] w-full">
+                  <LineChart
+                    data={timelineData}
+                    margin={{
+                      top: 5,
+                      right: 10,
+                      left: 10,
+                      bottom: 5,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis
+                      dataKey="formattedDate"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      className="text-xs"
+                      tick={{ fill: "currentColor" }}
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      className="text-xs"
+                      tick={{ fill: "currentColor" }}
+                    />
+                    <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent indicator="dot" />}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="commits"
+                      stroke="var(--color-commits)"
+                      strokeWidth={2}
+                      dot={{ fill: "var(--color-commits)", r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ChartContainer>
+              )}
+            </CardContent>
+          </Card>
         </motion.div>
 
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid gap-6 md:grid-cols-2"
+          className="grid gap-6 md:grid-cols-3"
         >
           {/* Contributors List */}
           <motion.div variants={itemVariants}>
-            <Card>
+            <Card className="bg-background h-full">
               <CardHeader>
                 <CardTitle>Contributors ({contributors.length})</CardTitle>
                 <CardDescription>
@@ -402,7 +410,7 @@ export default function RepositoryDetailPage() {
 
           {/* Impact Analysis */}
           <motion.div variants={itemVariants}>
-            <Card>
+            <Card className="bg-background h-full">
             <CardHeader>
               <CardTitle>User Impact</CardTitle>
               <CardDescription>
@@ -435,6 +443,68 @@ export default function RepositoryDetailPage() {
             </CardContent>
           </Card>
           </motion.div>
+
+          {/* Language Distribution */}
+          {languageData.length > 0 && (
+            <motion.div variants={itemVariants}>
+              <Card className="bg-background h-full">
+                <CardHeader>
+                  <CardTitle>Language Distribution</CardTitle>
+                  <CardDescription>
+                    Breakdown of programming languages used in this repository
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Shared Progress Bar */}
+                    <div className="w-full h-3 rounded-full overflow-hidden bg-secondary flex">
+                      {languageData.map((entry: { name: string; value: number; percentage: string }, index: number) => {
+                        const percentage = parseFloat(entry.percentage);
+                        
+                        return (
+                          <div
+                            key={entry.name}
+                            className="h-full"
+                            style={{
+                              width: `${percentage}%`,
+                              backgroundColor: LANGUAGE_COLORS[index % LANGUAGE_COLORS.length],
+                            }}
+                            title={`${entry.name}: ${entry.percentage}%`}
+                          />
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Language List */}
+                    <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
+                      {languageData.map((entry: { name: string; value: number; percentage: string }, index: number) => {
+                        const bytes = entry.value;
+                        const mb = (bytes / (1024 * 1024)).toFixed(2);
+                        const kb = (bytes / 1024).toFixed(2);
+                        const size = bytes >= 1024 * 1024 ? `${mb} MB` : `${kb} KB`;
+                        
+                        return (
+                          <div key={entry.name} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="h-3 w-3 rounded-full"
+                                style={{ backgroundColor: LANGUAGE_COLORS[index % LANGUAGE_COLORS.length] }}
+                              />
+                              <span className="font-medium">{entry.name}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-muted-foreground">{size}</span>
+                              <span className="font-semibold text-foreground">{entry.percentage}%</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
         </motion.div>
       </div>
     </motion.div>
