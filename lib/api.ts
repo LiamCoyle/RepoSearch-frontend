@@ -107,23 +107,6 @@ export const api = {
   },
 
   /**
-   * Get repository details
-   * @param owner - Repository owner (username or organization)
-   * @param repo - Repository name
-   */
-  async getRepositoryDetails(
-    owner: string,
-    repo: string
-  ): Promise<RepositoryDetails> {
-    if (!owner.trim() || !repo.trim()) {
-      throw new ApiError('Owner and repo parameters are required', 400);
-    }
-    return fetchApi<RepositoryDetails>(
-      `/github/get_repository_details?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`
-    );
-  },
-
-  /**
    * Get repository by ID
    * @param id - Repository ID
    */

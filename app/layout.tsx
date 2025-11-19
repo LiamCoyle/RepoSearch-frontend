@@ -17,6 +17,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "GitHub Repository Search",
   description: "Search for GitHub repositories",
+  icons: {
+    icon: "/github-mark-white.svg",
+    shortcut: "/github-mark-white.svg",
+    apple: "/github-mark-white.png",
+  },
 };
 
 export default function RootLayout({
