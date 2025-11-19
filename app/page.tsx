@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, X, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import Image from "next/image";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +20,8 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [perPage] = useState(10);
+  const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
   // Health check on initial load
   useEffect(() => {
@@ -31,6 +35,11 @@ export default function Home() {
     };
 
     checkHealth();
+  }, []);
+
+  // Avoid hydration mismatch for theme
+  useEffect(() => {
+    setMounted(true);
   }, []);
 
   const handleSearch = async (page: number = 1) => {
@@ -276,12 +285,44 @@ export default function Home() {
                       transition={{ duration: 0.5, ease: "easeOut" }}
                       className="flex flex-col items-center justify-center gap-6 h-full min-h-[400px]"
                     >
-                      <div className="relative">
+                      <motion.div 
+                        className="relative"
+                        whileHover="hover"
+                        initial="default"
+                      >
                         <div className="absolute inset-0 rounded-full bg-primary/10 blur-lg"></div>
-                        <div className="relative rounded-full bg-muted/50 border border-border/50 p-6 backdrop-blur-sm">
-                          <Search className="h-10 w-10 text-muted-foreground" />
+                        <div className="relative rounded-full bg-muted/50 border border-border/50 p-6 backdrop-blur-sm w-20 h-20 flex items-center justify-center">
+                          <motion.div
+                            variants={{
+                              default: { opacity: 1 },
+                              hover: { opacity: 0 }
+                            }}
+                            transition={{ duration: 0.3 }}
+                            className="absolute inset-0 flex items-center justify-center"
+                          >
+                            <Search className="h-8 w-8 text-muted-foreground" />
+                          </motion.div>
+                          <motion.div
+                            variants={{
+                              default: { opacity: 0 },
+                              hover: { opacity: 1 }
+                            }}
+                            transition={{ duration: 0.3 }}
+                            className="absolute inset-0 flex items-center justify-center"
+                          >
+                            {mounted && (
+                              <Image
+                                src={theme === "dark" ? "/github-mark-white.svg" : "/github-mark.svg"}
+                                alt="GitHub"
+                                width={32}
+                                height={32}
+                                className="h-8 w-8"
+                                unoptimized
+                              />
+                            )}
+                          </motion.div>
                         </div>
-                      </div>
+                      </motion.div>
                       <div className="text-center space-y-4">
                         <p className="text-base text-muted-foreground leading-relaxed">
                           Enter a search query above to find repositories on GitHub.
